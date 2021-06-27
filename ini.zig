@@ -98,3 +98,17 @@ pub fn getTok(data: []const u8, pos: *usize, state: *State) ?Token {
     }
     return null;
 }
+pub fn writeStruct(struct_value: anytype, writer: anytype) !void {
+    inline for (std.meta.fields(@TypeOf(struct_value))) |field| {
+        try writer.print("[{s}]\n", .{field.name});
+        const pairs = @field(struct_value, field.name);
+        inline for (std.meta.fields(@TypeOf(pairs))) |pair| {
+            const key_value = @field(pairs, pair.name);
+            const format = switch (@TypeOf(key_value)) {
+                []const u8 => "{s}",
+                else => "{}"
+            };
+            try writer.print("{s} = " ++ format ++ "\n", .{pair.name, key_value});
+        }
+    }
+}

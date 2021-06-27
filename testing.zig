@@ -2,7 +2,7 @@ const std = @import("std");
 const ini = @import("ini.zig");
 const file = @embedFile("test.ini");
 
-pub fn main() void {
+pub fn main() !void {
     var pos: usize = 0;
     var state = ini.State.normal;
     while (ini.getTok(file, &pos, &state)) |tok| {
@@ -13,4 +13,19 @@ pub fn main() void {
             .comment => std.debug.print("comment\n", .{}),
         }
     }
+    const TestingConfig = struct {
+        core: struct {
+            foo: []const u8,
+            goo: isize,
+            cool: bool
+        }
+    };
+    const lol = TestingConfig {
+        .core = .{
+            .foo = "bar",
+            .goo = 32,
+            .cool = true
+        }
+    };
+    try ini.writeStruct(lol, std.io.getStdErr().writer());
 }
