@@ -28,4 +28,17 @@ pub fn main() !void {
         }
     };
     try ini.writeStruct(lol, std.io.getStdErr().writer());
+    const NewConfig = struct {
+        core: struct {
+            repositoryformatversion: isize,
+            filemode: bool,
+            bare: bool,
+            logallrefupdates: bool
+        }
+    };
+    const str = try ini.readToStruct(NewConfig, file);
+    std.debug.print("core.repositoryformatversion: {}\n", .{str.core.repositoryformatversion});
+    std.debug.print("core.filemode: {}\n", .{str.core.filemode});
+    std.debug.print("core.bare: {}\n", .{str.core.bare});
+    std.debug.print("core.logallrefupdates: {}\n", .{str.core.logallrefupdates});
 }

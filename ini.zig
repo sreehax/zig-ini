@@ -98,6 +98,63 @@ pub fn getTok(data: []const u8, pos: *usize, state: *State) ?Token {
     }
     return null;
 }
+pub fn readToStruct(comptime T: type, data: []const u8) !T {
+    var namespace: []const u8 = "";
+    var pos: usize = 0;
+    var state: State = .normal;
+    var ret = std.mem.zeroes(T);
+    while (getTok(data, &pos, &state)) |tok| {
+        switch (tok) {
+            .comment => {},
+            .section => |ns| {
+                namespace = ns;
+            },
+            .key => |key| {
+                var next_tok = getTok(data, &pos, &state);
+                // if there's nothing just give a comment which is also a syntax error
+                switch (next_tok orelse .comment) {
+                    .value => |value| {
+                        // now we have the namespace, key, and value
+                        // namespace and key are runtime values, so we need to loop the struct instead of using @field
+                        inline for(std.meta.fields(T)) |ns_info| {
+                            if (std.mem.eql(u8, ns_info.name, namespace)) {
+                                // @field(ret, ns_info.name) contains the inner struct now
+                                // loop over the fields of the inner struct, and check for key matches
+                                inline for(std.meta.fields(@TypeOf(@field(ret, ns_info.name)))) |key_info| {
+                                    if (std.mem.eql(u8, key_info.name, key)) {
+                                        // now we have a key match, give it the value
+                                        const my_type = @TypeOf(@field(@field(ret, ns_info.name), key_info.name));
+                                        @field(@field(ret, ns_info.name), key_info.name) = try convert(my_type, value);
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    // after a key, a value must follow
+                    else => return error.SyntaxError
+                }
+            },
+            // if we get a value with no key, that's a bit nonsense
+            .value => return error.SyntaxError
+        }
+    }
+    return ret;
+}
+// I'll add more later
+const truthyAndFalsy = std.ComptimeStringMap(bool, .{
+    .{ "true", true },
+    .{ "false", false },
+    .{ "1", true },
+    .{ "0", false }
+});
+pub fn convert(comptime T: type, val: []const u8) !T {
+    return switch (@typeInfo(T)) {
+        .Int, .ComptimeInt => try std.fmt.parseInt(T, val, 0),
+        .Float, .ComptimeFloat => try std.fmt.parseFloat(T, val),
+        .Bool => truthyAndFalsy.get(val).?,
+        else => @as(T, val)
+    };
+}
 pub fn writeStruct(struct_value: anytype, writer: anytype) !void {
     inline for (std.meta.fields(@TypeOf(struct_value))) |field| {
         try writer.print("[{s}]\n", .{field.name});
